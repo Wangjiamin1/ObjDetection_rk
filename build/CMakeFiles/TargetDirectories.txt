@@ -1,0 +1,3 @@
+/home/wjm/code/ObjDetection/build/CMakeFiles/ObjDetction.dir
+/home/wjm/code/ObjDetection/build/CMakeFiles/edit_cache.dir
+/home/wjm/code/ObjDetection/build/CMakeFiles/rebuild_cache.dir
