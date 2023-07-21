@@ -9,7 +9,7 @@
 #include <vector>
 #include <string>
 #include <opencv2/opencv.hpp>
-#include <ncurses.h>
+// #include <ncurses.h>
 
 #define _BASETSD_H
 
@@ -233,12 +233,12 @@ int DetectorInit(MODEL_INFO *m)
 
     memset(&rga_ctx, 0, sizeof(rga_context));
     memset(&drm_ctx, 0, sizeof(drm_context));
-    drm_fd = drm_init(&drm_ctx);
+    // drm_fd = drm_init(&drm_ctx);
 
     m->m_type = YOLOX;
     m->color_expect = RK_FORMAT_RGB_888;
     m->anchor_per_branch = 1;
-    m->m_path = "/home/wjm/code/ObjDetection/yoloxs_tk2_RK3588_i8.rknn";
+    m->m_path = "../yoloxs_tk2_RK3588_i8.rknn";
     char *anchor_path = " ";
     // 输入图像地址
     m->in_path = "";
@@ -301,10 +301,10 @@ int DetectorRun(cv::Mat &img, std::vector<StObject> &st_objs)
     img_height = img.rows;
     img_channel = img.channels();
     // std::cout << "raw_img:whc" << img_width << " " << img_height << " " << img_channel;
-    drm_buf = drm_buf_alloc(&drm_ctx, drm_fd, img_width, img_height, img_channel * 8,
-                            &buf_fd, &handle, &actual_size);
-    memcpy(drm_buf, img.data, img_width * img_height * img_channel);
-    memset(resize_buf, 0, inputs[0].size);
+    // drm_buf = drm_buf_alloc(&drm_ctx, drm_fd, img_width, img_height, img_channel * 8,
+    //                         &buf_fd, &handle, &actual_size);
+    // memcpy(drm_buf, img.data, img_width * img_height * img_channel);
+    // memset(resize_buf, 0, inputs[0].size);
 
     // Letter box resize
     letter_box.target_height = m_info.height;
@@ -315,9 +315,9 @@ int DetectorRun(cv::Mat &img, std::vector<StObject> &st_objs)
 
     // Init rga context
     RGA_init(&rga_ctx);
-    img_resize_slow(&rga_ctx, drm_buf, img_width, img_height, resize_buf, letter_box.resize_width, letter_box.resize_height,
-                    letter_box.w_pad, letter_box.h_pad, m_info.color_expect,
-                    letter_box.add_extra_sz_w_pad, letter_box.add_extra_sz_h_pad);
+    // img_resize_slow(&rga_ctx, drm_buf, img_width, img_height, resize_buf, letter_box.resize_width, letter_box.resize_height,
+    //                 letter_box.w_pad, letter_box.h_pad, m_info.color_expect,
+    //                 letter_box.add_extra_sz_w_pad, letter_box.add_extra_sz_h_pad);
     inputs[0].buf = resize_buf;
 
     // gettimeofday(&start_time, NULL);
@@ -370,7 +370,7 @@ int DetectorRun(cv::Mat &img, std::vector<StObject> &st_objs)
     // img.save("./out.bmp");
     // cv::imwrite("./out.jpg",img);
     ret = rknn_outputs_release(ctx, m_info.out_nodes, outputs);
-    drm_buf_destroy(&drm_ctx, drm_fd, buf_fd, handle, drm_buf, actual_size);
+    // drm_buf_destroy(&drm_ctx, drm_fd, buf_fd, handle, drm_buf, actual_size);
 }
 
 void DetectorRelease()
@@ -393,20 +393,20 @@ void DetectorRelease()
     {
         free(m_info.out_attr);
     }
-    drm_deinit(&drm_ctx, drm_fd);
+    // drm_deinit(&drm_ctx, drm_fd);
 }
 
 int main()
 {
 
     DetectorInit(&m_info);
-    cv::VideoCapture cap("/root/4.mp4");
+    cv::VideoCapture cap("/app/4.mp4");
     cv::Mat frame;
     std::vector<StObject> st_objs;
     CTracker *tracker = new CTracker();
     std::vector<StObject> tracks;
     double fps = cap.get(cv::CAP_PROP_FPS);
-    cv::VideoWriter writer("./output.mp4", cv::VideoWriter::fourcc('m', 'p', '4', 'v'), fps, cv::Size(cap.get(cv::CAP_PROP_FRAME_WIDTH), cap.get(cv::CAP_PROP_FRAME_HEIGHT)));
+    cv::VideoWriter writer("./output.mp4", cv::VideoWriter::fourcc('m', 'p', '4', 'v'), 15, cv::Size(cap.get(cv::CAP_PROP_FRAME_WIDTH), cap.get(cv::CAP_PROP_FRAME_HEIGHT)));
 
     cap >> frame;
     while (!frame.empty())
