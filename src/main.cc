@@ -13,6 +13,8 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <yaml-cpp/yaml.h>
+#include <fstream>
+// #include <ncurses.h>
 
 #define _BASETSD_H
 
@@ -388,9 +390,9 @@ int DetectorRun(cv::Mat &img, std::vector<StObject> &st_objs)
         if (det_result->prop > 0.5)
         {
 
-            cv::rectangle(img, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(0, 255, 0), 2);
-            cv::putText(img, det_result->name, cv::Point(x1, y1 - 35), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 0, 0), 2);
-            cv::putText(img, score_result, cv::Point(x1, y1 - 17), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 0, 0), 2);
+            // cv::rectangle(img, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(0, 255, 0), 2);
+            // cv::putText(img, det_result->name, cv::Point(x1, y1 - 35), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 0, 0), 2);
+            // cv::putText(img, score_result, cv::Point(x1, y1 - 17), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 0, 0), 2);
             st_obj.x = x1;
             st_obj.y = y1;
             st_obj.w = x2 - x1;
@@ -427,7 +429,27 @@ void DetectorRelease()
     }
 }
 
-int main(int argc, char **argv)
+std::string intToStringWithPadding(int num, int padding)
+{
+    std::ostringstream oss;
+    oss << std::setw(padding) << std::setfill('0') << num;
+    return oss.str();
+}
+
+std::string boxToString1(StObject &box)
+{
+    std::ostringstream oss;
+    oss << box.clsId << " " << box.x << " " << box.y << " " << box.x + box.w << " " << box.y + box.h << "\n";
+    return oss.str();
+}
+std::string boxToString3(StObject &box)
+{
+    std::ostringstream oss;
+    oss << box.clsId << " " << box.x << " " << box.y << " " << box.x + box.w << " " << box.y + box.h << " " << box.objId << "\n";
+    return oss.str();
+}
+
+int main()
 {
 
     if (argc < 3)
@@ -445,93 +467,155 @@ int main(int argc, char **argv)
         std::vector<StObject> st_objs;
         // CTracker *tracker = new CTracker();
         // std::vector<StObject> tracks;
-        double fps = cap.get(cv::CAP_PROP_FPS);
-        cv::VideoWriter writer("./output.mp4", cv::VideoWriter::fourcc('m', 'p', '4', 'v'), fps, cv::Size(cap.get(cv::CAP_PROP_FRAME_WIDTH), cap.get(cv::CAP_PROP_FRAME_HEIGHT)));
+        // double fps = cap.get(cv::CAP_PROP_FPS);
+        // cv::VideoWriter writer("./output.mp4", cv::VideoWriter::fourcc('m', 'p', '4', 'v'), fps, cv::Size(cap.get(cv::CAP_PROP_FRAME_WIDTH), cap.get(cv::CAP_PROP_FRAME_HEIGHT)));
+
+        CTracker *tracker = new CTracker();
+        std::vector<StObject> tracks;
+        // double fps = cap.get(cv::CAP_PROP_FPS);
+        // cv::VideoWriter writer("./output.mp4", cv::VideoWriter::fourcc('m', 'p', '4', 'v'), 15, cv::Size(cap.get(cv::CAP_PROP_FRAME_WIDTH), cap.get(cv::CAP_PROP_FRAME_HEIGHT)));
 
         cap >> frame;
+
+        int framecnt = 0;
+        std::string ImgName1, LabelName1;
+        std::string ImgName3, LabelName3;
+        int padding = 4;
+        std::string ImgFolderPath1 = "/app/result/sd1/img/";
+        std::string LabelFolderPath1 = "/app/result/sd1/label/";
+        std::string ImgFolderPath3 = "/app/result/sd3/img/";
+        std::string LabelFolderPath3 = "/app/result/sd3/label/";
+        std::string ImgPath1, LabelPath1, ImgPath3, LabelPath3;
+
         while (!frame.empty())
         {
+            ImgName1 = "sd1_" + intToStringWithPadding(framecnt, padding) + ".jpg";
+            LabelName1 = "sd1_" + intToStringWithPadding(framecnt, padding) + ".txt";
+            ImgPath1 = ImgFolderPath1 + ImgName1;
+            LabelPath1 = LabelFolderPath1 + LabelName1;
+
+            ImgName3 = "sd3_" + intToStringWithPadding(framecnt, padding) + ".jpg";
+            LabelName3 = "sd3_" + intToStringWithPadding(framecnt, padding) + ".txt";
+            ImgPath3 = ImgFolderPath3 + ImgName3;
+            LabelPath3 = LabelFolderPath3 + LabelName3;
+
+            printf("ImgPath1:%s\n, LabelPath1:%s\n", ImgPath1.c_str(), LabelPath1.c_str());
+
+            std::ofstream file1(LabelPath1);
+            std::ofstream file3(LabelPath3);
+            if (!file1.is_open() || !file3.is_open())
+            {
+                printf("label file open failed\n");
+                return 0;
+            }
+
             st_objs.clear();
             gettimeofday(&start_time, NULL);
             // 目标检测
             DetectorRun(frame, st_objs);
+
+            cap >> frame;
+            // while (!frame.empty())
+            // {
+            //     st_objs.clear();
+            //     gettimeofday(&start_time, NULL);
+            //     // 目标检测
+            //     DetectorRun(frame, st_objs);
 
             // for(auto& track:st_objs)
             // {
             // printf("tarck id:%d, clsId:%d, x:%d, age:%d, lostcnt:%d\n", track.objId, track.clsId, track.x, track.age, track.lostframe);
             // }
             // //--------------目标融合--------------------------------------------------------
-            // tracker->update(st_objs);
-            // tracks.clear();
+            tracker->update(st_objs);
+            tracks.clear();
 
-            // tracker->GetTracks(tracks);
+            tracker->GetTracks(tracks);
 
-            // for (auto &track : tracks)
-            // {
-            //     cv::Point topLeft(track.x, track.y);
-            //     cv::Point bottomRight(track.x + track.w, track.y + track.h);
-            //     cv::rectangle(frame, topLeft, bottomRight, cv::Scalar(0, 0, 255), 2);
-            //     cv::putText(frame, std::to_string(track.objId), cv::Point(track.x, track.y + 4), cv::FONT_HERSHEY_PLAIN, 1.2, cv::Scalar::all(0xFF), 2);
-            // }
+            for (auto &track : tracks)
+            {
+                cv::Point topLeft(track.x, track.y);
+                cv::Point bottomRight(track.x + track.w, track.y + track.h);
+                cv::rectangle(frame, topLeft, bottomRight, cv::Scalar(0, 0, 255), 2);
+                cv::putText(frame, std::to_string(track.objId), cv::Point(track.x, track.y + 4), cv::FONT_HERSHEY_PLAIN, 1.2, cv::Scalar::all(0xFF), 2);
+
+                file1 << boxToString1(track);
+                file3 << boxToString3(track);
+            }
             //----------------------------------------------------------------
             gettimeofday(&stop_time, NULL);
             printf("single frame run use %f ms\n",
                    (__get_us(stop_time) - __get_us(start_time)) / 1000);
-            writer.write(frame);
+            // writer.write(frame);
             // cv::imwrite("./1.jpg", frame);
             cap >> frame;
         }
         cap.release();
-        writer.release();
+        // writer.release();
     }
-    else if (strcmp(argv[1], "img") == 0)
-    {
-        std::vector<StObject> st_objs;
-        std::string sourceFolder = argv[2];
-        std::string targetFolder = "output_images";
-        DIR *dir = opendir(sourceFolder.c_str());
-        mkdir(targetFolder.c_str(), 0777);
-        if (dir == nullptr)
-        {
-            std::cout << "无法打开源文件夹" << std::endl;
-            return -1;
-        }
-        mkdir(targetFolder.c_str(), 0777);
-        // 遍历源文件夹
-        struct dirent *entry;
-        while ((entry = readdir(dir)) != nullptr)
-        {
-            st_objs.clear();
-            // 忽略特殊目录
-            if (entry->d_type == DT_DIR || std::string(entry->d_name) == "." || std::string(entry->d_name) == "..")
-            {
-                continue;
-            }
+    // else if (strcmp(argv[1], "img") == 0)
+    // {
+    //     std::vector<StObject> st_objs;
+    //     std::string sourceFolder = argv[2];
+    //     std::string targetFolder = "output_images";
+    //     DIR *dir = opendir(sourceFolder.c_str());
+    //     mkdir(targetFolder.c_str(), 0777);
+    //     if (dir == nullptr)
+    //     {
+    //         std::cout << "无法打开源文件夹" << std::endl;
+    //         return -1;
+    //     }
+    //     mkdir(targetFolder.c_str(), 0777);
+    //     // 遍历源文件夹
+    //     struct dirent *entry;
+    //     while ((entry = readdir(dir)) != nullptr)
+    //     {
+    //         st_objs.clear();
+    //         // 忽略特殊目录
+    //         if (entry->d_type == DT_DIR || std::string(entry->d_name) == "." || std::string(entry->d_name) == "..")
+    //         {
+    //             continue;
+    //         }
 
-            // 读取图像文件
-            std::string imagePath = sourceFolder + "/" + std::string(entry->d_name);
-            cv::Mat image = cv::imread(imagePath);
-            if (image.empty())
-            {
-                std::cout << "无法读取图像文件：" << imagePath << std::endl;
-                continue;
-            }
-            gettimeofday(&start_time, NULL);
-            // 目标检测
-            DetectorRun(image, st_objs);
-            gettimeofday(&stop_time, NULL);
-            printf("single frame run use %f ms\n",
-                   (__get_us(stop_time) - __get_us(start_time)) / 1000);
+    //         // 读取图像文件
+    //         std::string imagePath = sourceFolder + "/" + std::string(entry->d_name);
+    //         cv::Mat image = cv::imread(imagePath);
+    //         if (image.empty())
+    //         {
+    //             std::cout << "无法读取图像文件：" << imagePath << std::endl;
+    //             continue;
+    //         }
+    //         gettimeofday(&start_time, NULL);
+    //         // 目标检测
+    //         DetectorRun(image, st_objs);
+    //         gettimeofday(&stop_time, NULL);
+    //         printf("single frame run use %f ms\n",
+    //                (__get_us(stop_time) - __get_us(start_time)) / 1000);
 
-            // 保存图像文件到目标文件夹
-            std::string targetPath = targetFolder + "/" + std::string(entry->d_name);
-            cv::imwrite(targetPath, image);
-        }
+    //         // 保存图像文件到目标文件夹
+    //         std::string targetPath = targetFolder + "/" + std::string(entry->d_name);
+    //         cv::imwrite(targetPath, image);
+    //     }
 
-        // 关闭文件夹
-        closedir(dir);
-    }
+    //     // 关闭文件夹
+    //     closedir(dir);
+    // }
 
+    //     }
+    //     //----------------------------------------------------------------
+    //     gettimeofday(&stop_time, NULL);
+    //     printf("single frame run use %f ms\n",
+    //            (__get_us(stop_time) - __get_us(start_time)) / 1000);
+    //     // writer.write(frame);
+    //     cv::imwrite(ImgPath1, frame);
+    //     cv::imwrite(ImgPath3, frame);
+    //     file1.close();
+    //     file3.close();
+    //     framecnt++;
+    //     // cv::imwrite("./1.jpg", frame);
+    //     cap >> frame;
+    // }
+    // cap.release();
+    // // writer.release();
     DetectorRelease();
 }
-
