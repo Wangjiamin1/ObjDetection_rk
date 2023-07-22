@@ -237,9 +237,7 @@ int DetectorInit(MODEL_INFO *m)
     int status = 0;
 
     m->m_type = YOLOX;
-    m->color_expect = RK_FORMAT_RGB_888;
     m->anchor_per_branch = 1;
-    // m->m_path = model_path.c_str();
 
     const char *charPtr = model_path.c_str();
     m->m_path = strdup(charPtr);
@@ -325,8 +323,6 @@ void analysisYaml()
 
 int DetectorRun(cv::Mat &img, std::vector<StObject> &st_objs)
 {
-    cv::Mat rsimg;
-    cv::resize(img, rsimg, cv::Size(m_info.width, m_info.height));
     /* Init input tensor */
     rknn_input inputs[1];
 
@@ -379,6 +375,8 @@ int DetectorRun(cv::Mat &img, std::vector<StObject> &st_objs)
     {
         StObject st_obj;
         detect_result_t *det_result = &(detect_result_group.results[i]);
+        // std::cout<<"_______________________"<<det_result->name<<std::endl;
+        printf("%s", det_result->name);
         printf("%s @ (%d %d %d %d) %f\n",
                det_result->name,
                det_result->box.left, det_result->box.top, det_result->box.right, det_result->box.bottom,
@@ -392,9 +390,9 @@ int DetectorRun(cv::Mat &img, std::vector<StObject> &st_objs)
         if (det_result->prop > 0.5)
         {
 
-            // cv::rectangle(img, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(0, 255, 0), 2);
-            // cv::putText(img, det_result->name, cv::Point(x1, y1 - 35), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 0, 0), 2);
-            // cv::putText(img, score_result, cv::Point(x1, y1 - 17), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 0, 0), 2);
+            cv::rectangle(img, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(0, 255, 0), 2);
+            cv::putText(img, det_result->name, cv::Point(x1, y1 - 32), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 0, 0), 2);
+            cv::putText(img, score_result, cv::Point(x1, y1 - 14), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 0, 0), 2);
             st_obj.x = x1;
             st_obj.y = y1;
             st_obj.w = x2 - x1;
@@ -441,7 +439,7 @@ int main(int argc, char **argv)
     analysisYaml();
     DetectorInit(&m_info);
     std::vector<StObject> st_objs;
-    std::string sourceFolder = argv[2];
+    std::string sourceFolder = argv[1];
     std::string targetFolder = "output_images";
     DIR *dir = opendir(sourceFolder.c_str());
     mkdir(targetFolder.c_str(), 0777);

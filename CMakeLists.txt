@@ -7,7 +7,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 
 # install target and libraries
-#set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/install/rknn_yolov5_demo_${CMAKE_SYSTEM_NAME})
+set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/build)
 
 set(CMAKE_SKIP_INSTALL_RPATH FALSE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
@@ -25,17 +25,10 @@ set(PLATFORM RK3588)
 set(LIB_ARCH aarch64)
 set(RKNN_API_PATH ${CMAKE_SOURCE_DIR}/libs/rklibs/rknpu2/runtime/RK3588/Linux/librknn_api)
 set(RKNN_RT_LIB ${RKNN_API_PATH}/${LIB_ARCH}/librknnrt.so)
-set(RKNN_DRM_LIB ${CMAKE_SOURCE_DIR}/libs/rklibs/librga/samples/utils/3rdparty/libdrm/lib/arm64/libdrm.so)
-set(RGA_PATH ${CMAKE_SOURCE_DIR}/libs/rklibs/librga)
 
 
 include_directories(${RKNN_API_PATH}/include)
 
-
-# drm
-set(DRM_DIR ${CMAKE_SOURCE_DIR}/libs/common/drm)
-include_directories(${DRM_DIR}/include)
-include_directories(${DRM_DIR}/include/libdrm)
 
 
 #stb CImg
@@ -72,8 +65,6 @@ set(CMAKE_INSTALL_RPATH "lib")
 include_directories( ${CMAKE_SOURCE_DIR}/include)
 
 add_executable(ObjDetction
-        src/drm_func.c
-        src/rga_func.c
         src/yolo.cc
         src/main.cc
         src/tracker.cpp
@@ -81,24 +72,18 @@ add_executable(ObjDetction
 
 target_link_libraries(ObjDetction -lyaml-cpp
   ${RKNN_RT_LIB}
-  ${RGA_LIB}
   ${LIBJPEG_LIB}
   ${LIBPNG_LIB}
   ${ZLIB_LIB}
-  ${RKNN_DRM_LIB}
   dl
   ${OpenCV_LIBS}
 )
 
 # install target and libraries
-# set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/install/)
 # install(TARGETS ObjDetction DESTINATION ./)
 
-# install(PROGRAMS ${RKNN_RT_LIB} DESTINATION lib)
-# install(PROGRAMS ${RKNN_DRM_LIB} DESTINATION lib)
-# install(PROGRAMS ${RGA_LIB} DESTINATION lib)
-# install(PROGRAMS /lib/libx264.so.164 DESTINATION lib)
-# install(DIRECTORY model DESTINATION ./)
+install(PROGRAMS ${RKNN_RT_LIB} DESTINATION lib)
+install(PROGRAMS /lib/libx264.so.164 DESTINATION lib)
 
 
 

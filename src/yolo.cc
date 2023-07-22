@@ -54,7 +54,7 @@ char *readLine(FILE *fp, char *buffer, int *len)
         buffer[i] = (char)ch;
         i++;
     }
-    buffer[i] = '\0';
+    buffer[--i] = '\0';
 
     *len = buff_len;
 

@@ -5,7 +5,7 @@
 #include <iostream>
 #include <string>
 #include "rknn_api.h"
-#include "rga_func.h"
+// #include "rga_func.h"
 
 #define OBJ_NAME_MAX_SIZE 16
 #define OBJ_NUMB_MAX_SIZE 200
@@ -53,7 +53,7 @@ typedef struct _MODEL_INFO{
     int channel;
     int height; 
     int width;
-    RgaSURF_FORMAT color_expect;
+    // RgaSURF_FORMAT color_expect;
 
     int anchors[18];
     int anchor_per_branch;
