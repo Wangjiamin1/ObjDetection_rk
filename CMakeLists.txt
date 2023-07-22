@@ -79,7 +79,7 @@ add_executable(ObjDetction
         src/tracker.cpp
 )
 
-target_link_libraries(ObjDetction
+target_link_libraries(ObjDetction -lyaml-cpp
   ${RKNN_RT_LIB}
   ${RGA_LIB}
   ${LIBJPEG_LIB}

@@ -1,3 +1,3 @@
-model_path: /home/wjm/code/ObjDetection/model/yolox_RK3588_i8.rknn
-LABEL_NALE_TXT_PATH: /home/wjm/code/ObjDetection/model/classes.txt
+model_path: /app/prog/code/ObjDetection_rk/yoloxs_tk2_RK3588_i8.rknn
+LABEL_NALE_TXT_PATH: /app/prog/code/ObjDetection_rk/model/coco_80_labels_list.txt
 OBJ_CLASS_NUM: 3

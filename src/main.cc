@@ -9,7 +9,7 @@
 #include <vector>
 #include <string>
 #include <opencv2/opencv.hpp>
-#include <ncurses.h>
+// #include <ncurses.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <yaml-cpp/yaml.h>
@@ -325,6 +325,8 @@ void analysisYaml()
 
 int DetectorRun(cv::Mat &img, std::vector<StObject> &st_objs)
 {
+    cv::Mat rsimg;
+    cv::resize(img, rsimg, cv::Size(m_info.width, m_info.height));
     /* Init input tensor */
     rknn_input inputs[1];
 
@@ -449,13 +451,13 @@ std::string boxToString3(StObject &box)
     return oss.str();
 }
 
-int main()
+int main(int argc, char **argv)
 {
 
     if (argc < 3)
     {
         std::cout << "./Objdetection video/img path" << std::endl;
-        return -1;
+        // return -1;
     }
     analysisYaml();
     DetectorInit(&m_info);
@@ -548,6 +550,11 @@ int main()
                    (__get_us(stop_time) - __get_us(start_time)) / 1000);
             // writer.write(frame);
             // cv::imwrite("./1.jpg", frame);
+            cv::imwrite(ImgPath1, frame);
+            cv::imwrite(ImgPath3, frame);
+            file1.close();
+            file3.close();
+            framecnt++;
             cap >> frame;
         }
         cap.release();
