@@ -1,0 +1,3 @@
+model_path: /home/wjm/code/ObjDetection/model/yolox_RK3588_i8.rknn
+LABEL_NALE_TXT_PATH: /home/wjm/code/ObjDetection/model/classes.txt
+OBJ_CLASS_NUM: 3

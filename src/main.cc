@@ -9,7 +9,10 @@
 #include <vector>
 #include <string>
 #include <opencv2/opencv.hpp>
-// #include <ncurses.h>
+#include <ncurses.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <yaml-cpp/yaml.h>
 
 #define _BASETSD_H
 
@@ -28,8 +31,8 @@
 #define cimg_use_png 1
 #include "CImg/CImg.h"
 
-#include "drm_func.h"
-#include "rga_func.h"
+// #include "drm_func.h"
+// #include "rga_func.h"
 #include "rknn_api.h"
 #include "yolo.h"
 #include "common.h"
@@ -205,11 +208,6 @@ int query_model_info(MODEL_INFO *m, rknn_context ctx)
 
 static int status = 0;
 static rknn_context ctx;
-static rga_context rga_ctx;
-static drm_context drm_ctx;
-int drm_fd = -1;
-int buf_fd = -1; // converted from buffer handle
-void *drm_buf = NULL;
 unsigned int handle;
 MODEL_INFO m_info;
 LETTER_BOX letter_box;
@@ -219,6 +217,11 @@ static int img_height = 0;
 static int img_channel = 0;
 void *resize_buf;
 unsigned char *model_data;
+static int startX, startY, ratio;
+std::string model_path;
+std::string LABEL_NALE_TXT_PATH;
+int OBJ_CLASS_NUM;
+int PROP_BOX_SIZE;
 
 // static const float nms_threshold = NMS_THRESH;
 // static const float box_conf_threshold = BOX_THRESH;
@@ -231,14 +234,13 @@ int DetectorInit(MODEL_INFO *m)
 {
     int status = 0;
 
-    memset(&rga_ctx, 0, sizeof(rga_context));
-    memset(&drm_ctx, 0, sizeof(drm_context));
-    // drm_fd = drm_init(&drm_ctx);
-
     m->m_type = YOLOX;
     m->color_expect = RK_FORMAT_RGB_888;
     m->anchor_per_branch = 1;
-    m->m_path = "../yoloxs_tk2_RK3588_i8.rknn";
+    // m->m_path = model_path.c_str();
+
+    const char *charPtr = model_path.c_str();
+    m->m_path = strdup(charPtr);
     char *anchor_path = " ";
     // 输入图像地址
     m->in_path = "";
@@ -265,6 +267,57 @@ int DetectorInit(MODEL_INFO *m)
     if (ret < 0)
     {
         return -1;
+    }
+}
+
+cv::Mat preprocess(const cv::Mat originalImage)
+{
+    int originalWidth = originalImage.cols;
+    int originalHeight = originalImage.rows;
+    // 创建一个新的 640x640 大小的黑色图像
+    cv::Mat resizedImage(640, 640, CV_8UC3, cv::Scalar(0, 0, 0));
+
+    // 计算调整大小后的图像的宽度和高度
+    int resizedWidth, resizedHeight;
+    if (originalWidth > originalHeight)
+    {
+        resizedWidth = 640;
+        ratio = originalWidth / 640.0;
+        resizedHeight = originalHeight * 640 / originalWidth;
+    }
+    else
+    {
+        resizedWidth = originalWidth * 640 / originalHeight;
+        ratio = originalWidth / 640.0;
+        resizedHeight = 640;
+    }
+    // 计算调整大小后图像的起始坐标
+    startX = (640 - resizedWidth) / 2;
+    startY = (640 - resizedHeight) / 2;
+
+    // 调整大小并将原始图像复制到新图像中
+    cv::resize(originalImage, resizedImage(cv::Rect(startX, startY, resizedWidth, resizedHeight)), cv::Size(resizedWidth, resizedHeight));
+    return resizedImage;
+}
+
+void analysisYaml()
+{
+    std::string filePath = "../config.yaml";
+    try
+    {
+        // 加载YAML文件
+        YAML::Node config = YAML::LoadFile(filePath);
+
+        // 读取person节点中的数据
+        model_path = config["model_path"].as<std::string>();
+
+        LABEL_NALE_TXT_PATH = config["LABEL_NALE_TXT_PATH"].as<std::string>();
+        OBJ_CLASS_NUM = config["OBJ_CLASS_NUM"].as<int>();
+        PROP_BOX_SIZE = 5 + OBJ_CLASS_NUM;
+    }
+    catch (const YAML::Exception &e)
+    {
+        std::cout << "Failed to load YAML file: " << e.what() << std::endl;
     }
 }
 
@@ -297,29 +350,9 @@ int DetectorRun(cv::Mat &img, std::vector<StObject> &st_objs)
     }
     void *rk_outputs_buf[m_info.out_nodes];
 
-    img_width = img.cols;
-    img_height = img.rows;
-    img_channel = img.channels();
-    // std::cout << "raw_img:whc" << img_width << " " << img_height << " " << img_channel;
-    // drm_buf = drm_buf_alloc(&drm_ctx, drm_fd, img_width, img_height, img_channel * 8,
-    //                         &buf_fd, &handle, &actual_size);
-    // memcpy(drm_buf, img.data, img_width * img_height * img_channel);
-    // memset(resize_buf, 0, inputs[0].size);
+    cv::Mat pre_img = preprocess(img);
 
-    // Letter box resize
-    letter_box.target_height = m_info.height;
-    letter_box.target_width = m_info.width;
-    letter_box.in_height = img_height;
-    letter_box.in_width = img_width;
-    compute_letter_box(&letter_box);
-
-    // Init rga context
-    RGA_init(&rga_ctx);
-    // img_resize_slow(&rga_ctx, drm_buf, img_width, img_height, resize_buf, letter_box.resize_width, letter_box.resize_height,
-    //                 letter_box.w_pad, letter_box.h_pad, m_info.color_expect,
-    //                 letter_box.add_extra_sz_w_pad, letter_box.add_extra_sz_h_pad);
-    inputs[0].buf = resize_buf;
-
+    inputs[0].buf = pre_img.data;
     // gettimeofday(&start_time, NULL);
     rknn_inputs_set(ctx, m_info.in_nodes, inputs);
     ret = rknn_run(ctx, NULL);
@@ -329,7 +362,7 @@ int DetectorRun(cv::Mat &img, std::vector<StObject> &st_objs)
     detect_result_group_t detect_result_group;
     for (auto i = 0; i < m_info.out_nodes; i++)
         rk_outputs_buf[i] = outputs[i].buf;
-    post_process(rk_outputs_buf, &m_info, &letter_box, &detect_result_group);
+    post_process(rk_outputs_buf, &m_info, &detect_result_group, LABEL_NALE_TXT_PATH, ratio, startX, startY);
 
     gettimeofday(&stop_time, NULL);
     printf("once run use %f ms\n",
@@ -354,13 +387,14 @@ int DetectorRun(cv::Mat &img, std::vector<StObject> &st_objs)
         // draw box
         if (det_result->prop > 0.5)
         {
+
             cv::rectangle(img, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(0, 255, 0), 2);
-            // cv::putText(img, det_result->name, cv::Point(x1, y1 - 24), cv::FONT_HERSHEY_SIMPLEX, 0.9, cv::Scalar(0, 255, 0), 2);
-            // cv::putText(img, score_result, cv::Point(x1, y1 - 12), cv::FONT_HERSHEY_SIMPLEX, 0.9, cv::Scalar(0, 255, 0), 2);
-            st_obj.x = detect_result_group.results[i].box.left;
-            st_obj.y = detect_result_group.results[i].box.top;
-            st_obj.w = detect_result_group.results[i].box.right - st_obj.x;
-            st_obj.h = detect_result_group.results[i].box.bottom - st_obj.y;
+            cv::putText(img, det_result->name, cv::Point(x1, y1 - 35), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 0, 0), 2);
+            cv::putText(img, score_result, cv::Point(x1, y1 - 17), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 0, 0), 2);
+            st_obj.x = x1;
+            st_obj.y = y1;
+            st_obj.w = x2 - x1;
+            st_obj.h = y2 - y1;
             st_obj.clsId = detect_result_group.results[i].class_index;
             std::cout << st_obj.x << st_obj.y << st_obj.w << st_obj.h << st_obj.clsId << std::endl;
             st_objs.push_back(st_obj);
@@ -370,7 +404,6 @@ int DetectorRun(cv::Mat &img, std::vector<StObject> &st_objs)
     // img.save("./out.bmp");
     // cv::imwrite("./out.jpg",img);
     ret = rknn_outputs_release(ctx, m_info.out_nodes, outputs);
-    // drm_buf_destroy(&drm_ctx, drm_fd, buf_fd, handle, drm_buf, actual_size);
 }
 
 void DetectorRelease()
@@ -378,7 +411,6 @@ void DetectorRelease()
     // release
     ret = rknn_destroy(ctx);
 
-    RGA_deinit(&rga_ctx);
     if (model_data)
     {
         free(model_data);
@@ -393,55 +425,113 @@ void DetectorRelease()
     {
         free(m_info.out_attr);
     }
-    // drm_deinit(&drm_ctx, drm_fd);
 }
 
-int main()
+int main(int argc, char **argv)
 {
 
-    DetectorInit(&m_info);
-    cv::VideoCapture cap("/app/4.mp4");
-    cv::Mat frame;
-    std::vector<StObject> st_objs;
-    CTracker *tracker = new CTracker();
-    std::vector<StObject> tracks;
-    double fps = cap.get(cv::CAP_PROP_FPS);
-    cv::VideoWriter writer("./output.mp4", cv::VideoWriter::fourcc('m', 'p', '4', 'v'), 15, cv::Size(cap.get(cv::CAP_PROP_FRAME_WIDTH), cap.get(cv::CAP_PROP_FRAME_HEIGHT)));
-
-    cap >> frame;
-    while (!frame.empty())
+    if (argc < 3)
     {
-        st_objs.clear();
-        gettimeofday(&start_time, NULL);
-        // 目标检测
-        DetectorRun(frame, st_objs);
-
-        for(auto& track:st_objs)
-        {
-        printf("tarck id:%d, clsId:%d, x:%d, age:%d, lostcnt:%d\n", track.objId, track.clsId, track.x, track.age, track.lostframe);
-        }
-        //--------------目标融合--------------------------------------------------------
-        tracker->update(st_objs);
-        tracks.clear();
-
-        tracker->GetTracks(tracks);
-
-        for (auto &track : tracks)
-        {
-            cv::Point topLeft(track.x, track.y);
-            cv::Point bottomRight(track.x + track.w, track.y + track.h);
-            cv::rectangle(frame, topLeft, bottomRight, cv::Scalar(0, 0, 255), 2);
-            cv::putText(frame, std::to_string(track.objId), cv::Point(track.x, track.y + 4), cv::FONT_HERSHEY_PLAIN, 1.2, cv::Scalar::all(0xFF), 2);
-        }
-        //----------------------------------------------------------------
-        gettimeofday(&stop_time, NULL);
-        printf("single frame run use %f ms\n",
-               (__get_us(stop_time) - __get_us(start_time)) / 1000);
-        writer.write(frame);
-        // cv::imwrite("./1.jpg", frame);
-        cap >> frame;
+        std::cout << "./Objdetection video/img path" << std::endl;
+        return -1;
     }
-    cap.release();
-    writer.release();
+    analysisYaml();
+    DetectorInit(&m_info);
+    if (strcmp(argv[1], "video") == 0)
+    {
+        std::string videoPath = argv[2];
+        cv::VideoCapture cap(videoPath);
+        cv::Mat frame;
+        std::vector<StObject> st_objs;
+        // CTracker *tracker = new CTracker();
+        // std::vector<StObject> tracks;
+        double fps = cap.get(cv::CAP_PROP_FPS);
+        cv::VideoWriter writer("./output.mp4", cv::VideoWriter::fourcc('m', 'p', '4', 'v'), fps, cv::Size(cap.get(cv::CAP_PROP_FRAME_WIDTH), cap.get(cv::CAP_PROP_FRAME_HEIGHT)));
+
+        cap >> frame;
+        while (!frame.empty())
+        {
+            st_objs.clear();
+            gettimeofday(&start_time, NULL);
+            // 目标检测
+            DetectorRun(frame, st_objs);
+
+            // for(auto& track:st_objs)
+            // {
+            // printf("tarck id:%d, clsId:%d, x:%d, age:%d, lostcnt:%d\n", track.objId, track.clsId, track.x, track.age, track.lostframe);
+            // }
+            // //--------------目标融合--------------------------------------------------------
+            // tracker->update(st_objs);
+            // tracks.clear();
+
+            // tracker->GetTracks(tracks);
+
+            // for (auto &track : tracks)
+            // {
+            //     cv::Point topLeft(track.x, track.y);
+            //     cv::Point bottomRight(track.x + track.w, track.y + track.h);
+            //     cv::rectangle(frame, topLeft, bottomRight, cv::Scalar(0, 0, 255), 2);
+            //     cv::putText(frame, std::to_string(track.objId), cv::Point(track.x, track.y + 4), cv::FONT_HERSHEY_PLAIN, 1.2, cv::Scalar::all(0xFF), 2);
+            // }
+            //----------------------------------------------------------------
+            gettimeofday(&stop_time, NULL);
+            printf("single frame run use %f ms\n",
+                   (__get_us(stop_time) - __get_us(start_time)) / 1000);
+            writer.write(frame);
+            // cv::imwrite("./1.jpg", frame);
+            cap >> frame;
+        }
+        cap.release();
+        writer.release();
+    }
+    else if (strcmp(argv[1], "img") == 0)
+    {
+        std::vector<StObject> st_objs;
+        std::string sourceFolder = argv[2];
+        std::string targetFolder = "output_images";
+        DIR *dir = opendir(sourceFolder.c_str());
+        mkdir(targetFolder.c_str(), 0777);
+        if (dir == nullptr)
+        {
+            std::cout << "无法打开源文件夹" << std::endl;
+            return -1;
+        }
+        mkdir(targetFolder.c_str(), 0777);
+        // 遍历源文件夹
+        struct dirent *entry;
+        while ((entry = readdir(dir)) != nullptr)
+        {
+            st_objs.clear();
+            // 忽略特殊目录
+            if (entry->d_type == DT_DIR || std::string(entry->d_name) == "." || std::string(entry->d_name) == "..")
+            {
+                continue;
+            }
+
+            // 读取图像文件
+            std::string imagePath = sourceFolder + "/" + std::string(entry->d_name);
+            cv::Mat image = cv::imread(imagePath);
+            if (image.empty())
+            {
+                std::cout << "无法读取图像文件：" << imagePath << std::endl;
+                continue;
+            }
+            gettimeofday(&start_time, NULL);
+            // 目标检测
+            DetectorRun(image, st_objs);
+            gettimeofday(&stop_time, NULL);
+            printf("single frame run use %f ms\n",
+                   (__get_us(stop_time) - __get_us(start_time)) / 1000);
+
+            // 保存图像文件到目标文件夹
+            std::string targetPath = targetFolder + "/" + std::string(entry->d_name);
+            cv::imwrite(targetPath, image);
+        }
+
+        // 关闭文件夹
+        closedir(dir);
+    }
+
     DetectorRelease();
 }
+

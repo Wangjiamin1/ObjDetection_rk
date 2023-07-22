@@ -2,16 +2,24 @@
 #define _RKNN_ZERO_COPY_DEMO_POSTPROCESS_H_
 
 #include <stdint.h>
+#include <iostream>
+#include <string>
 #include "rknn_api.h"
 #include "rga_func.h"
 
 #define OBJ_NAME_MAX_SIZE 16
 #define OBJ_NUMB_MAX_SIZE 200
-#define OBJ_CLASS_NUM     80
-#define PROP_BOX_SIZE     (5+OBJ_CLASS_NUM)
 #define NMS_THRESHOLD     0.45
 #define CONF_THRESHOLD    0.25
 #define MAX_OUTPUTS 3
+
+#ifndef GLOBALS_H
+#define GLOBALS_H
+
+extern int OBJ_CLASS_NUM;
+extern int PROP_BOX_SIZE;
+
+#endif
 
 typedef enum
 {
@@ -97,11 +105,10 @@ typedef struct _detect_result_group_t
 
 int readLines(const char *fileName, char *lines[], int max_line);
 
-int compute_letter_box(LETTER_BOX* lb);
+int post_process(void** rk_outputs, MODEL_INFO* m, detect_result_group_t* group,std::string LABEL_NALE_TXT_PATH ,float ratio, int startX, int startY);
 
-//int post_process(rknn_output* rk_outputs, MODEL_INFO* m, LETTER_BOX* lb, detect_result_group_t* group);
-int post_process(void** rk_outputs, MODEL_INFO* m, LETTER_BOX* lb, detect_result_group_t* group);
 
 int readFloats(const char *fileName, float *result, int max_line, int* valid_number);
 
 #endif //_RKNN_ZERO_COPY_DEMO_POSTPROCESS_H_
+
