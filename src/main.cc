@@ -238,6 +238,7 @@ int DetectorInit(MODEL_INFO *m)
 
     m->m_type = YOLOX;
     m->anchor_per_branch = 1;
+    m->post_type = FP;
 
     const char *charPtr = model_path.c_str();
     m->m_path = strdup(charPtr);
