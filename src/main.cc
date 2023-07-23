@@ -219,7 +219,8 @@ static int img_height = 0;
 static int img_channel = 0;
 void *resize_buf;
 unsigned char *model_data;
-static int startX, startY, ratio;
+static int startX, startY;
+static float ratio;
 std::string model_path;
 std::string LABEL_NALE_TXT_PATH;
 int OBJ_CLASS_NUM;
@@ -289,7 +290,7 @@ cv::Mat preprocess(const cv::Mat originalImage)
     else
     {
         resizedWidth = originalWidth * 640 / originalHeight;
-        ratio = originalWidth / 640.0;
+        ratio = originalHeight / 640.0;
         resizedHeight = 640;
     }
     // 计算调整大小后图像的起始坐标
